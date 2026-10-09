@@ -1,0 +1,19 @@
+# Chot LF cho file se chay tren runner macOS. Neu bi doi thanh CRLF,
+# shebang "#!/usr/bin/env bash" se loi: "bash\r: command not found".
+*.sh   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+# File text cua Xcode/Unity - giu nguyen LF de tranh diff loan
+*.pbxproj text eol=lf
+*.plist   text eol=lf
+*.xcprivacy text eol=lf
+*.storyboard text eol=lf
+# Binary - khong dung den
+*.png binary
+*.jpg binary
+*.rar binary
+*.a    binary
+*.xcassets/** binary
+*.framework/** binary
+Libraries/*.a filter=lfs diff=lfs merge=lfs -text

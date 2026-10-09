@@ -1,0 +1,20 @@
+# Archive lon (159 MB) - GitHub chan file >100 MB, KHONG duoc commit
+Xcode.rar
+
+# Ket qua build (chi o thu muc goc - khong dung 'build/' vi se an luon
+# Il2CppOutputProject/build cua Unity export)
+/build/
+DerivedData/
+*.ipa
+*.xcarchive
+/Payload/
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+Unity-iPhone.xcodeproj/project.xcworkspace/xcuserdata/
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
