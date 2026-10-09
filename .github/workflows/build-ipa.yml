@@ -1,42 +1,145 @@
-name: Build unsigned IPA
-
-# Build file .ipa khong ky tren macOS runner cua GitHub (mien phi voi repo public).
-# Sau khi chay xong, tai file .ipa trong tab Actions -> chon run -> Artifacts.
+name: NroChamPa
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [main, master]
+workflow_dispatch:
+push:
+branches:
+- main
+- master
+
+permissions:
+contents: read
 
 jobs:
-  build:
-    runs-on: macos-14
-    timeout-minutes: 120
+build:
+name: Build NroChamPa IPA
+runs-on: macos-14
+timeout-minutes: 120
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+```
+steps:
+  # 1. Download source code and real Git LFS files.
+  - name: Checkout repository
+    uses: actions/checkout@v4
+    with:
+      lfs: true
+      fetch-depth: 1
 
-      - name: Select Xcode
-        run: |
-          # Xcode 15.4: ho tro deployment target iOS 12.0 cua project nay.
-          sudo xcode-select -s /Applications/Xcode_15.4.app
-          xcodebuild -version
-          xcrun --sdk iphoneos --show-sdk-version
+  # 2. Select Xcode.
+  - name: Select Xcode
+    shell: bash
+    run: |
+      set -euo pipefail
 
-      - name: Build unsigned IPA
-        run: bash scripts/build-ipa.sh
+      if [ -d "/Applications/Xcode_15.4.app/Contents/Developer" ]; then
+        sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+      else
+        echo "Xcode 15.4 not found. Using the runner's selected Xcode."
+      fi
 
-      - name: Verify IPA
-        run: |
-          set -euo pipefail
-          ls -lh build/*.ipa
-          unzip -l build/*.ipa | head -20
+      xcode-select -p
+      xcodebuild -version
+      xcrun --sdk iphoneos --show-sdk-version
 
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: NroChamPa-unsigned-ipa
-          path: build/*.ipa
-          if-no-files-found: error
-          retention-days: 30
+  # 3. Check Unity static libraries before building.
+  - name: Check Unity libraries
+    shell: bash
+    run: |
+      set -u
+
+      echo "== Repository: $GITHUB_WORKSPACE"
+
+      for f in \
+        Libraries/libiPhone-lib.a \
+        Libraries/baselib.a
+      do
+        if [ -f "$f" ]; then
+          echo
+          echo "== Checking $f"
+          file "$f"
+
+          if head -c 100 "$f" | grep -q 'git-lfs.github.com/spec'; then
+            echo "::error file=$f::Git LFS pointer detected instead of a real library."
+            exit 1
+          fi
+        else
+          echo "::warning::Library not found: $f"
+        fi
+      done
+
+      echo
+      echo "== Xcode project files"
+      find . -maxdepth 3 \
+        \( -name '*.xcodeproj' -o -name '*.xcworkspace' \) \
+        -print
+
+  # 4. Ensure the build script exists.
+  - name: Check build script
+    shell: bash
+    run: |
+      set -euo pipefail
+      test -f scripts/build-ipa.sh
+      chmod +x scripts/build-ipa.sh
+
+  # 5. Build and save detailed logs.
+  - name: Build unsigned IPA
+    shell: bash
+    env:
+      PROJECT: Unity-iPhone.xcodeproj
+      SCHEME: Unity-iPhone
+      CONFIG: Release
+      APP_NAME: NroChamPa
+      IPA_NAME: NroChamPa.ipa
+      OUT_DIR: ${{ runner.temp }}/NroChamPa-output
+    run: |
+      set -o pipefail
+      bash scripts/build-ipa.sh 2>&1 | tee "$RUNNER_TEMP/NroChamPa-build.log"
+
+  # 6. Diagnose library formats if build fails.
+  - name: Diagnose build failure
+    if: failure()
+    shell: bash
+    run: |
+      echo "== Static library file types =="
+
+      find Libraries "$RUNNER_TEMP/NroChamPa-output" \
+        -type f \( -name '*.a' -o -name '*.framework' \) \
+        -print 2>/dev/null |
+      while IFS= read -r f; do
+        echo
+        echo "FILE: $f"
+        file "$f" || true
+      done
+
+      echo
+      echo "== Last build log lines =="
+      if [ -f "$RUNNER_TEMP/NroChamPa-build.log" ]; then
+        tail -n 150 "$RUNNER_TEMP/NroChamPa-build.log"
+      fi
+
+  # 7. Verify the resulting IPA.
+  - name: Verify IPA
+    shell: bash
+    env:
+      OUT_DIR: ${{ runner.temp }}/NroChamPa-output
+    run: |
+      set -euo pipefail
+
+      IPA="$OUT_DIR/NroChamPa.ipa"
+
+      test -s "$IPA"
+      unzip -t "$IPA"
+      unzip -Z1 "$IPA" | grep -E '^Payload/[^/]+\.app/Info\.plist$'
+
+      echo "== IPA details =="
+      ls -lh "$IPA"
+
+  # 8. Upload the IPA.
+  - name: Upload IPA
+    uses: actions/upload-artifact@v4
+    with:
+      name: NroChamPa
+      path: ${{ runner.temp }}/NroChamPa-output/NroChamPa.ipa
+      if-no-files-found: error
+      retention-days: 30
+```
