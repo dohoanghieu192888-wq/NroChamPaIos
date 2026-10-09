@@ -16,7 +16,6 @@ name: Build NroChamPa IPA
 runs-on: macos-14
 timeout-minutes: 120
 
-```
 steps:
   # 1. Download source code and real Git LFS files.
   - name: Checkout repository
@@ -142,4 +141,3 @@ steps:
       path: ${{ runner.temp }}/NroChamPa-output/NroChamPa.ipa
       if-no-files-found: error
       retention-days: 30
-```
